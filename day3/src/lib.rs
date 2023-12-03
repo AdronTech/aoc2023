@@ -9,7 +9,7 @@ pub enum EnginePart {
 }
 
 #[derive(Debug)]
-pub enum SchmaticCell {
+pub enum SchematicCell {
     Empty,
     Part(EnginePart),
     PotentialPartNumber(u8),
@@ -17,25 +17,25 @@ pub enum SchmaticCell {
 }
 
 // parse the input into a 2d array of SchmaticCell
-fn parse_schematic(input: &str) -> Vec<Vec<SchmaticCell>> {
+fn parse_schematic(input: &str) -> Vec<Vec<SchematicCell>> {
     input
         .lines()
         .map(|line| {
             line.chars()
                 .map(|c| match c {
-                    '.' => SchmaticCell::Empty,
+                    '.' => SchematicCell::Empty,
                     x if x.is_digit(10) => {
-                        SchmaticCell::PotentialPartNumber(c.to_digit(10).unwrap() as u8)
+                        SchematicCell::PotentialPartNumber(c.to_digit(10).unwrap() as u8)
                     }
-                    c => SchmaticCell::Part(EnginePart::Unknown(c)),
+                    c => SchematicCell::Part(EnginePart::Unknown(c)),
                 })
-                .collect::<Vec<SchmaticCell>>()
+                .collect::<Vec<SchematicCell>>()
         })
-        .collect::<Vec<Vec<SchmaticCell>>>()
+        .collect::<Vec<Vec<SchematicCell>>>()
 }
 
 fn flood_transform_potential_part_numbers(
-    schematic: &mut Vec<Vec<SchmaticCell>>,
+    schematic: &mut Vec<Vec<SchematicCell>>,
     x: i32,
     y: i32,
     part_coords: &(usize, usize),
@@ -45,9 +45,9 @@ fn flood_transform_potential_part_numbers(
     }
 
     match schematic[y as usize][x as usize] {
-        SchmaticCell::PotentialPartNumber(n) => {
+        SchematicCell::PotentialPartNumber(n) => {
             schematic[y as usize][x as usize] =
-                SchmaticCell::PartialPartNumber(n, part_coords.clone());
+                SchematicCell::PartialPartNumber(n, part_coords.clone());
             flood_transform_potential_part_numbers(schematic, x + 1, y, part_coords);
             flood_transform_potential_part_numbers(schematic, x - 1, y, part_coords);
         }
@@ -56,10 +56,10 @@ fn flood_transform_potential_part_numbers(
 }
 
 // transform potential part numbers into part numbers if they are adjacent to a part
-fn transform_potential_part_numbers(schematic: &mut Vec<Vec<SchmaticCell>>) {
+fn transform_potential_part_numbers(schematic: &mut Vec<Vec<SchematicCell>>) {
     for y in 0..schematic.len() {
         for x in 0..schematic[y].len() {
-            if let SchmaticCell::Part(_) = schematic[y][x] {
+            if let SchematicCell::Part(_) = schematic[y][x] {
                 for dx in (-1 as i32)..=1 {
                     for dy in (-1 as i32)..=1 {
                         if dx == 0 && dy == 0 {
@@ -79,7 +79,7 @@ fn transform_potential_part_numbers(schematic: &mut Vec<Vec<SchmaticCell>>) {
     }
 }
 
-fn extract_part_numbers(schematic: &Vec<Vec<SchmaticCell>>) -> Vec<u32> {
+fn extract_part_numbers(schematic: &Vec<Vec<SchematicCell>>) -> Vec<u32> {
     let mut part_numbers = Vec::new();
 
     // combine adjecent partial part numbers into a single part number
@@ -87,7 +87,7 @@ fn extract_part_numbers(schematic: &Vec<Vec<SchmaticCell>>) -> Vec<u32> {
     for y in 0..schematic.len() {
         for x in 0..schematic[y].len() {
             match schematic[y][x] {
-                SchmaticCell::PartialPartNumber(n, _) => part_number.push_str(&n.to_string()),
+                SchematicCell::PartialPartNumber(n, _) => part_number.push_str(&n.to_string()),
                 _ => {
                     if !part_number.is_empty() {
                         part_numbers.push(part_number.parse::<u32>().unwrap());
@@ -118,7 +118,7 @@ fn calc_partnumber_sum(input: &str) -> u32 {
     part_numbers.iter().sum()
 }
 
-fn get(x: i32, y: i32, schematic: &Vec<Vec<SchmaticCell>>) -> Option<&SchmaticCell> {
+fn get(x: i32, y: i32, schematic: &Vec<Vec<SchematicCell>>) -> Option<&SchematicCell> {
     if x < 0 || y < 0 || y >= schematic.len() as i32 || x >= schematic[y as usize].len() as i32 {
         return None;
     }
@@ -127,7 +127,7 @@ fn get(x: i32, y: i32, schematic: &Vec<Vec<SchmaticCell>>) -> Option<&SchmaticCe
 }
 
 fn get_part_numbers_flood(
-    schematic: &Vec<Vec<SchmaticCell>>,
+    schematic: &Vec<Vec<SchematicCell>>,
     x: i32,
     y: i32,
     already_checked: &mut Vec<(i32, i32)>,
@@ -139,7 +139,7 @@ fn get_part_numbers_flood(
 
     let mut part_numbers = Vec::new();
 
-    if let Some(SchmaticCell::PartialPartNumber(n, _)) = get(x, y, schematic) {
+    if let Some(SchematicCell::PartialPartNumber(n, _)) = get(x, y, schematic) {
         flood_get_part_numbers_around(schematic, x - 1, y, already_checked);
         flood_get_part_numbers_around(schematic, x + 1, y, already_checked);
     }
@@ -147,7 +147,7 @@ fn get_part_numbers_flood(
 
 }
 
-fn get_part_numbers_around(schematic: &Vec<Vec<SchmaticCell>>, x: i32, y: i32) -> Vec<u32> {
+fn get_part_numbers_around(schematic: &Vec<Vec<SchematicCell>>, x: i32, y: i32) -> Vec<u32> {
     let mut part_numbers = Vec::new();
     let mut already_checked = Vec::new();
 
@@ -171,10 +171,10 @@ fn get_part_numbers_around(schematic: &Vec<Vec<SchmaticCell>>, x: i32, y: i32) -
     part_numbers
 }
 
-fn mark_gears(schematic: &mut Vec<Vec<SchmaticCell>>) {
+fn mark_gears(schematic: &mut Vec<Vec<SchematicCell>>) {
     for y in 0..schematic.len() {
         for x in 0..schematic[y].len() {
-            if let SchmaticCell::Part(EnginePart::Unknown('*')) = schematic[y][x] {
+            if let SchematicCell::Part(EnginePart::Unknown('*')) = schematic[y][x] {
                 // let part_numbers = get_part_numbers_around(schematic, x as i32, y as i32);
                 // if part_numbers.len() != 2 {
                 //     continue;
@@ -182,7 +182,7 @@ fn mark_gears(schematic: &mut Vec<Vec<SchmaticCell>>) {
                 // let gear_ratio = part_numbers[0] * part_numbers[1];
                 let gear_ratio = 0;
 
-                schematic[y][x] = SchmaticCell::Part(EnginePart::Gear(gear_ratio));
+                schematic[y][x] = SchematicCell::Part(EnginePart::Gear(gear_ratio));
             }
         }
     }
@@ -201,7 +201,7 @@ fn calc_gear_ratio_sum(input: &str) -> u32 {
     let mut gear_ratio_sum = 0;
     for y in 0..schematic.len() {
         for x in 0..schematic[y].len() {
-            if let SchmaticCell::Part(EnginePart::Gear(gear_ratio)) = schematic[y][x] {
+            if let SchematicCell::Part(EnginePart::Gear(gear_ratio)) = schematic[y][x] {
                 gear_ratio_sum += gear_ratio;
             }
         }
