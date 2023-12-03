@@ -1,77 +1,129 @@
-use std::f32::consts::E;
+use std::{rc::Rc, cell::RefCell};
 
 mod debug;
 
 #[derive(Debug)]
-pub enum EnginePart {
-    Gear(u32),
+pub enum PartType {
+    Gear,
     Unknown(char),
+}
+
+#[derive(Debug)]
+pub struct Part {
+    pub part_type: PartType,
+    pub part_numbers: Vec<Rc<RefCell<PartNumber>>>,
+}
+
+impl Part {
+    pub fn new(part_type: PartType) -> Self {
+        Self {
+            part_type,
+            part_numbers: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PartNumber {
+    pub value: u32,
+    pub part: Option<Rc<RefCell<Part>>>,
+}
+
+impl PartNumber {
+    pub fn new(value: u32) -> Self {
+        Self { value, part: None }
+    }
 }
 
 #[derive(Debug)]
 pub enum SchematicCell {
     Empty,
-    Part(EnginePart),
-    PotentialPartNumber(u8),
-    PartialPartNumber(u8, (usize, usize)),
+    Part(Rc<RefCell<Part>>),
+    PotentialPartNumber(char),
+    PartialPartNumber(char, Rc<RefCell<PartNumber>>),
 }
 
+// alias schematic as a 2d array of SchematicCell
+type Schematic = Vec<Vec<SchematicCell>>;
+
 // parse the input into a 2d array of SchmaticCell
-fn parse_schematic(input: &str) -> Vec<Vec<SchematicCell>> {
+fn parse_schematic(input: &str) -> Schematic {
     input
         .lines()
         .map(|line| {
             line.chars()
                 .map(|c| match c {
                     '.' => SchematicCell::Empty,
-                    x if x.is_digit(10) => {
-                        SchematicCell::PotentialPartNumber(c.to_digit(10).unwrap() as u8)
-                    }
-                    c => SchematicCell::Part(EnginePart::Unknown(c)),
+                    d if d.is_digit(10) => SchematicCell::PotentialPartNumber(d),
+                    c => SchematicCell::Part(Rc::new(RefCell::new(Part::new(PartType::Unknown(c))))),
                 })
                 .collect::<Vec<SchematicCell>>()
         })
-        .collect::<Vec<Vec<SchematicCell>>>()
+        .collect::<Schematic>()
 }
 
-fn flood_transform_potential_part_numbers(
-    schematic: &mut Vec<Vec<SchematicCell>>,
-    x: i32,
-    y: i32,
-    part_coords: &(usize, usize),
-) {
-    if x < 0 || y < 0 || y >= schematic.len() as i32 || x >= schematic[y as usize].len() as i32 {
-        return;
-    }
-
-    match schematic[y as usize][x as usize] {
-        SchematicCell::PotentialPartNumber(n) => {
-            schematic[y as usize][x as usize] =
-                SchematicCell::PartialPartNumber(n, part_coords.clone());
-            flood_transform_potential_part_numbers(schematic, x + 1, y, part_coords);
-            flood_transform_potential_part_numbers(schematic, x - 1, y, part_coords);
-        }
-        _ => (),
-    }
-}
-
-// transform potential part numbers into part numbers if they are adjacent to a part
-fn transform_potential_part_numbers(schematic: &mut Vec<Vec<SchematicCell>>) {
+fn transform_part_numbers(schematic: &mut Schematic) {
+    let mut current_part_number: Option<Rc<RefCell<PartNumber>>> = None;
     for y in 0..schematic.len() {
         for x in 0..schematic[y].len() {
-            if let SchematicCell::Part(_) = schematic[y][x] {
-                for dx in (-1 as i32)..=1 {
-                    for dy in (-1 as i32)..=1 {
-                        if dx == 0 && dy == 0 {
+            if let SchematicCell::PotentialPartNumber(digit) = schematic[y][x] {
+                if let None = &current_part_number {
+                    current_part_number = Some(Rc::new(RefCell::new(PartNumber::new(digit.to_digit(10).unwrap()))));
+                } else if let Some(current_part_number) = &current_part_number {
+                    let mut current_part_number = current_part_number.as_ref().borrow_mut();
+                    current_part_number.value *= 10;
+                    current_part_number.value += digit.to_digit(10).unwrap();
+                }
+
+                schematic[y][x] = SchematicCell::PartialPartNumber(
+                    digit,
+                    Rc::clone(current_part_number.as_ref().unwrap()),
+                );
+            } else {
+                current_part_number = None;
+            }
+        }
+    }
+}
+
+fn assign_part_number(part: &Rc<RefCell<Part>>, part_number: &Rc<RefCell<PartNumber>>) {
+    if part
+    .borrow()
+    .part_numbers
+    .iter()
+    .any(|item| Rc::ptr_eq(item, part_number))
+    {
+        return;
+    }
+    
+    part.as_ref().borrow_mut().part_numbers.push(Rc::clone(part_number));
+    part_number.as_ref().borrow_mut().part = Some(Rc::clone(part));
+}
+
+fn assign_part_numbers(schematic: &mut Schematic) {
+    for y in 0..schematic.len() {
+        for x in 0..schematic[y].len() {
+            if let SchematicCell::Part(part) = &schematic[y][x] {
+                // assign part to part numbers in all neighbiouring cells
+                for dy in (-1 as i32)..=1 {
+                    for dx in (-1 as i32)..=1 {
+                        if dy == 0 && dx == 0 {
+                            continue;
+                        }
+                        let nx = x as i32 + dx;
+                        let ny = y as i32 + dy;
+                        if nx < 0 || nx >= schematic[y].len() as i32 {
+                            continue;
+                        }
+                        if ny < 0 || ny >= schematic.len() as i32 {
                             continue;
                         }
 
-                        flood_transform_potential_part_numbers(
-                            schematic,
-                            (x as i32) + dx,
-                            (y as i32) + dy,
-                            &(x, y),
-                        );
+                        if let SchematicCell::PartialPartNumber(_, part_number) =
+                            &schematic[ny as usize][nx as usize]
+                        {
+                            assign_part_number(part, part_number);
+                        }
                     }
                 }
             }
@@ -79,135 +131,85 @@ fn transform_potential_part_numbers(schematic: &mut Vec<Vec<SchematicCell>>) {
     }
 }
 
-fn extract_part_numbers(schematic: &Vec<Vec<SchematicCell>>) -> Vec<u32> {
-    let mut part_numbers = Vec::new();
-
-    // combine adjecent partial part numbers into a single part number
-    let mut part_number = String::new();
+fn transform_to_geared_parts(schematic: &mut Schematic) {
     for y in 0..schematic.len() {
         for x in 0..schematic[y].len() {
-            match schematic[y][x] {
-                SchematicCell::PartialPartNumber(n, _) => part_number.push_str(&n.to_string()),
-                _ => {
-                    if !part_number.is_empty() {
-                        part_numbers.push(part_number.parse::<u32>().unwrap());
-                        part_number.clear();
+            if let SchematicCell::Part(part) = &schematic[y][x] {
+                let mut p = part.as_ref().borrow_mut();
+
+                if let PartType::Unknown('*') = p.part_type {
+                    if p.part_numbers.len() != 2 {
+                        continue;
                     }
+
+                    p.part_type = PartType::Gear;
                 }
             }
         }
-        if !part_number.is_empty() {
-            part_numbers.push(part_number.parse::<u32>().unwrap());
-            part_number.clear();
+    }
+}
+
+fn get_all_valid_part_numbers(schematic: &Schematic) -> Vec<Rc<RefCell<PartNumber>>> {
+    let mut part_numbers = Vec::new();
+    for y in 0..schematic.len() {
+        for x in 0..schematic[y].len() {
+            if let SchematicCell::Part(part) = &schematic[y][x] {
+                let p = part.as_ref().borrow();
+                part_numbers.extend(p.part_numbers.iter().cloned());
+            }
         }
     }
-
     part_numbers
+    
 }
 
 fn calc_partnumber_sum(input: &str) -> u32 {
     let mut schematic = parse_schematic(input);
+    transform_part_numbers(&mut schematic);
+    assign_part_numbers(&mut schematic);
     debug::print_schematic(&schematic);
-    println!("-------------------");
-    transform_potential_part_numbers(&mut schematic);
+    println!("----------------------------------------");
+
+    transform_to_geared_parts(&mut schematic);
     debug::print_schematic(&schematic);
 
-    let part_numbers = extract_part_numbers(&schematic);
-    println!("{:?}", part_numbers);
-
-    part_numbers.iter().sum()
+    get_all_valid_part_numbers(&schematic).iter().map(|part_number| {
+        part_number.as_ref().borrow().value
+    }).sum()
 }
 
-fn get(x: i32, y: i32, schematic: &Vec<Vec<SchematicCell>>) -> Option<&SchematicCell> {
-    if x < 0 || y < 0 || y >= schematic.len() as i32 || x >= schematic[y as usize].len() as i32 {
-        return None;
-    }
-
-    Some(&schematic[y as usize][x as usize])
-}
-
-fn get_part_numbers_flood(
-    schematic: &Vec<Vec<SchematicCell>>,
-    x: i32,
-    y: i32,
-    already_checked: &mut Vec<(i32, i32)>,
-) -> Option<u32> {
-    if already_checked.contains(&(x, y)) {
-        return;
-    }
-    already_checked.push((x, y));
-
-    let mut part_numbers = Vec::new();
-
-    if let Some(SchematicCell::PartialPartNumber(n, _)) = get(x, y, schematic) {
-        flood_get_part_numbers_around(schematic, x - 1, y, already_checked);
-        flood_get_part_numbers_around(schematic, x + 1, y, already_checked);
-    }
-
-
-}
-
-fn get_part_numbers_around(schematic: &Vec<Vec<SchematicCell>>, x: i32, y: i32) -> Vec<u32> {
-    let mut part_numbers = Vec::new();
-    let mut already_checked = Vec::new();
-
-    for dx in (-1 as i32)..=1 {
-        for dy in (-1 as i32)..=1 {
-            if dx == 0 && dy == 0 {
-                continue;
-            }
-
-            if let Some(part_number) = get_part_numbers_flood(
-                schematic,
-                (x as i32) + dx,
-                (y as i32) + dy,
-                &mut already_checked,
-            ) {
-                part_numbers.push(part_number);
-            }
-        }
-    }
-
-    part_numbers
-}
-
-fn mark_gears(schematic: &mut Vec<Vec<SchematicCell>>) {
+fn get_all_gear_parts(schematic: &Schematic) -> Vec<Rc<RefCell<Part>>> {
+    let mut gear_parts = Vec::new();
     for y in 0..schematic.len() {
         for x in 0..schematic[y].len() {
-            if let SchematicCell::Part(EnginePart::Unknown('*')) = schematic[y][x] {
-                // let part_numbers = get_part_numbers_around(schematic, x as i32, y as i32);
-                // if part_numbers.len() != 2 {
-                //     continue;
-                // }
-                // let gear_ratio = part_numbers[0] * part_numbers[1];
-                let gear_ratio = 0;
-
-                schematic[y][x] = SchematicCell::Part(EnginePart::Gear(gear_ratio));
+            if let SchematicCell::Part(part) = &schematic[y][x] {
+                let p = part.as_ref().borrow();
+                if let PartType::Gear = p.part_type {
+                    gear_parts.push(Rc::clone(part));
+                }
             }
         }
     }
+
+    gear_parts
 }
 
 fn calc_gear_ratio_sum(input: &str) -> u32 {
     let mut schematic = parse_schematic(input);
+    transform_part_numbers(&mut schematic);
+    assign_part_numbers(&mut schematic);
     debug::print_schematic(&schematic);
-    println!("-------------------");
-    transform_potential_part_numbers(&mut schematic);
-    debug::print_schematic(&schematic);
-    println!("-------------------");
-    mark_gears(&mut schematic);
+    println!("----------------------------------------");
+
+    transform_to_geared_parts(&mut schematic);
     debug::print_schematic(&schematic);
 
-    let mut gear_ratio_sum = 0;
-    for y in 0..schematic.len() {
-        for x in 0..schematic[y].len() {
-            if let SchematicCell::Part(EnginePart::Gear(gear_ratio)) = schematic[y][x] {
-                gear_ratio_sum += gear_ratio;
-            }
-        }
-    }
-
-    gear_ratio_sum
+    get_all_gear_parts(&schematic).iter().map(|gear_part| {
+        // multiply all part numbers
+        gear_part.as_ref().borrow().part_numbers.iter().map(|part_number| {
+            part_number.as_ref().borrow().value
+        }).product::<u32>()
+    }).sum()
 }
 
 #[cfg(test)]
@@ -226,20 +228,20 @@ mod tests {
     fn large_input() {
         // You can also read the file completely into memory
         let file = std::fs::read_to_string("input/big.txt").expect("Could not open input file");
-        assert_eq!(calc_partnumber_sum(&file), 0)
+        assert_eq!(calc_partnumber_sum(&file), 553825)
     }
 
     #[test]
     fn small_input_power_sum() {
         // The easiest way to open the data is to include it into the generated binary.
         let input = include_str!("../input/small.txt");
-        assert_eq!(calc_gear_ratio_sum(input), 0)
+        assert_eq!(calc_gear_ratio_sum(input), 467835)
     }
 
-    // #[test]
-    // fn large_input_power_sum() {
-    //     // You can also read the file completely into memory
-    //     let file = std::fs::read_to_string("input/big.txt").expect("Could not open input file");
-    //     assert_eq!(calculate_power_sum(&file), 71535)
-    // }
+    #[test]
+    fn large_input_power_sum() {
+        // You can also read the file completely into memory
+        let file = std::fs::read_to_string("input/big.txt").expect("Could not open input file");
+        assert_eq!(calc_gear_ratio_sum(&file), 93994191)
+    }
 }
