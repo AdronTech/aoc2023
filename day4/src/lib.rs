@@ -1,5 +1,3 @@
-use nom::number;
-
 mod debug;
 
 fn parse_card(input: &str) -> (Vec<u32>, Vec<u32>) {
