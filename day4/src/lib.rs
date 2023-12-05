@@ -22,6 +22,10 @@ fn parse_card(input: &str) -> (Vec<u32>, Vec<u32>) {
 }
 
 fn score_card(number_of_matching_cards: u32) -> u32 {
+    if number_of_matching_cards == 0 {
+        return 0;
+    }
+
     1 * 2u32.pow(number_of_matching_cards - 1)
 }
 
