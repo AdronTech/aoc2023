@@ -1,0 +1,5 @@
+seeds: 50 50
+
+seed-to-soil map:
+155 55 3
+266 66 3
