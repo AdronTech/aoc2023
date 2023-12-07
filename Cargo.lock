@@ -62,6 +62,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "advent_of_code_day_6"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "colored",
+ "env_logger",
+ "itertools",
+ "log",
+ "nom",
+ "nom-supreme",
+]
+
+[[package]]
+name = "advent_of_code_day_7"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "colored",
+ "env_logger",
+ "itertools",
+ "log",
+ "nom",
+ "nom-supreme",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
