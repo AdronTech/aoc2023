@@ -1,6 +1,6 @@
 use colored::*;
 
-use crate::Pipe;
+use crate::{Pipe, ExpandedPipe};
 
 fn map_char(p: &Pipe) -> char {
     match p {
@@ -52,6 +52,34 @@ pub fn print_distances(distances: &Vec<Vec<Option<u32>>>) {
             match distance {
                 Some(d) => print!("{:1}", d.to_string().yellow()),
                 None => print!("{}", ".".black()),
+            }
+        }
+        println!();
+    }
+}
+
+pub fn print_expanded_pipes(expanded_pipes: &Vec<Vec<ExpandedPipe>>) {
+    for line in expanded_pipes {
+        for pipe in line {
+            match pipe {
+                ExpandedPipe::Pipe(_) => print!("{}", "#".yellow()),
+                ExpandedPipe::Unknown => print!("{}", ".".black()),
+                ExpandedPipe::Inside => print!("{}", "I".green()),
+                ExpandedPipe::Outside => print!("{}", "O".red()),
+            }
+        }
+        println!();
+    }
+}
+
+pub fn print_reduced_pipes(reduced_pipes: &Vec<Vec<ExpandedPipe>>) {
+    for line in reduced_pipes {
+        for pipe in line {
+            match pipe {
+                ExpandedPipe::Pipe(p) => print!("{}", map_char(p).to_string().yellow()),
+                ExpandedPipe::Unknown => print!("{}", ".".black()),
+                ExpandedPipe::Inside => print!("{}", "I".green()),
+                ExpandedPipe::Outside => print!("{}", "O".red()),
             }
         }
         println!();

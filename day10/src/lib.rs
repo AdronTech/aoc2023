@@ -63,6 +63,14 @@ impl Pipe {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ExpandedPipe {
+    Pipe(Pipe),
+    Unknown,
+    Inside,
+    Outside,
+}
+
 fn parse_pipes(input: &str) -> Vec<Vec<Pipe>> {
     input
         .lines()
@@ -169,7 +177,94 @@ fn find_farthest_pipe_distance(input: &str) -> u32 {
         .unwrap()
 }
 
-fn expand_pipes(original_pipes: &Vec<Vec<Pipe>>) -> Vec<Vec<Pipe>>
+fn expand_pipes(original_pipes: &Vec<Vec<Pipe>>) -> Vec<Vec<ExpandedPipe>> {
+    let mut expanded_pipes =
+        vec![vec![ExpandedPipe::Unknown; original_pipes[0].len() * 3]; original_pipes.len() * 3];
+
+    for y in 0..original_pipes.len() {
+        for x in 0..original_pipes[0].len() {
+            let pipe = &original_pipes[y][x];
+            let (x, y) = (x * 3, y * 3);
+
+            if let Pipe::Empty = pipe {
+                continue;
+            }
+
+            expanded_pipes[y + 1][x + 1] = ExpandedPipe::Pipe(pipe.clone());
+
+            for port in pipe.get_ports() {
+                let (offset_x, offset_y) = match port {
+                    Port::North => (1, 0),
+                    Port::East => (2, 1),
+                    Port::South => (1, 2),
+                    Port::West => (0, 1),
+                };
+                expanded_pipes[y + offset_y][x + offset_x] = ExpandedPipe::Pipe(pipe.clone());
+            }
+        }
+    }
+
+    expanded_pipes
+}
+
+fn reduce_pipes(expanded_pipes: &mut Vec<Vec<ExpandedPipe>>) -> Vec<Vec<ExpandedPipe>> {
+    let mut reduced_pipes = vec![vec![ExpandedPipe::Unknown; expanded_pipes[0].len() / 3]; expanded_pipes.len() / 3];
+    for y in 0..expanded_pipes.len() / 3 {
+        for x in 0..expanded_pipes[0].len() /3 {
+            let (x_expanded, y_expanded) = (x * 3, y * 3);
+            reduced_pipes[y][x] = expanded_pipes[y_expanded + 1][x_expanded + 1].clone();
+        }
+    }
+    reduced_pipes
+}
+
+fn flood_outside(expanded_pipes: &mut Vec<Vec<ExpandedPipe>>) {
+    let mut queue = queue![];
+
+    for y in 0..expanded_pipes.len() {
+        queue.add((0, y)).unwrap();
+        queue.add((expanded_pipes[0].len() - 1, y)).unwrap();
+    }
+
+    for x in 0..expanded_pipes[0].len() {
+        queue.add((x, 0)).unwrap();
+        queue.add((x, expanded_pipes.len() - 1)).unwrap();
+    }
+
+    while queue.size() > 0 {
+        let (x, y) = queue.remove().unwrap();
+        if let ExpandedPipe::Unknown = expanded_pipes[y][x] {
+            expanded_pipes[y][x] = ExpandedPipe::Outside;
+
+            for (offset_x, offset_y) in [(1, 0), (0, 1), (-1, 0), (0, -1)].iter() {
+                let (neighbor_x, neighbor_y) = (x as i32 + offset_x, y as i32 + offset_y);
+                if neighbor_x < 0
+                    || neighbor_y < 0
+                    || neighbor_x >= expanded_pipes[0].len() as i32
+                    || neighbor_y >= expanded_pipes.len() as i32
+                {
+                    continue;
+                }
+                let neighbor_x = neighbor_x as usize;
+                let neighbor_y = neighbor_y as usize;
+
+                if let ExpandedPipe::Unknown = expanded_pipes[neighbor_y][neighbor_x] {
+                    queue.add((neighbor_x, neighbor_y)).unwrap();
+                }
+            }
+        }
+    }
+}
+
+fn convert_unknown_to_inside(expanded_pipes: &mut Vec<Vec<ExpandedPipe>>) {
+    for y in 0..expanded_pipes.len() {
+        for x in 0..expanded_pipes[0].len() {
+            if let ExpandedPipe::Unknown = expanded_pipes[y][x] {
+                expanded_pipes[y][x] = ExpandedPipe::Inside;
+            }
+        }
+    }
+}   
 
 fn find_number_of_inside_fields(input: &str) -> u32 {
     let pipes = parse_pipes(input);
@@ -183,7 +278,17 @@ fn find_number_of_inside_fields(input: &str) -> u32 {
 
     debug::print_pipes_connected_to_start(&pipes, &distance_field);
 
-    todo!()
+    let mut expanded_pipes = expand_pipes(&pipes);
+    debug::print_expanded_pipes(&expanded_pipes);
+
+    flood_outside(&mut expanded_pipes);
+    convert_unknown_to_inside(&mut expanded_pipes);
+    debug::print_expanded_pipes(&expanded_pipes);
+
+    let mut reduced_pipes = reduce_pipes(&mut expanded_pipes);
+    debug::print_reduced_pipes(&reduced_pipes);
+
+    reduced_pipes.iter().flatten().filter(|p| **p == ExpandedPipe::Inside).count() as u32
 }
 
 #[cfg(test)]
@@ -212,23 +317,30 @@ mod tests {
     }
 
     #[test]
-    fn small_input_inside() {
+    fn small_enclosed_input_inside() {
         // The easiest way to open the data is to include it into the generated binary.
-        let input = include_str!("../input/small.txt");
-        assert_eq!(find_number_of_inside_fields(input), 0)
+        let input = include_str!("../input/small_enclosed.txt");
+        assert_eq!(find_number_of_inside_fields(input), 4)
     }
 
     #[test]
-    fn small_extended_inside() {
+    fn small_enclosed2_input_inside() {
         // The easiest way to open the data is to include it into the generated binary.
-        let input = include_str!("../input/small_extended.txt");
-        assert_eq!(find_number_of_inside_fields(input), 0)
+        let input = include_str!("../input/small_enclosed2.txt");
+        assert_eq!(find_number_of_inside_fields(input), 8)
+    }
+
+    #[test]
+    fn small_enclosed3_input_inside() {
+        // The easiest way to open the data is to include it into the generated binary.
+        let input = include_str!("../input/small_enclosed3.txt");
+        assert_eq!(find_number_of_inside_fields(input), 10)
     }
 
     #[test]
     fn large_input_inside() {
         // You can also read the file completely into memory
         let file = std::fs::read_to_string("input/big.txt").expect("Could not open input file");
-        assert_eq!(find_number_of_inside_fields(&file), 0)
+        assert_eq!(find_number_of_inside_fields(&file), 291)
     }
 }
