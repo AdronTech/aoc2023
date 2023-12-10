@@ -11,14 +11,19 @@ fn map_char(p: &Pipe) -> char {
         Pipe::NorthWest => '┘',
         Pipe::SouthWest => '┐',
         Pipe::SouthEast => '┌',
-        Pipe::Empty => ' ',
+        Pipe::Empty => '.',
     }
 }
 
 pub fn print_pipes(pipes: &Vec<Vec<Pipe>>) {
     for line in pipes {
         for pipe in line {
-            print!("{}", map_char(pipe));
+            let c = map_char(pipe);
+            match pipe {
+                Pipe::Start => print!("{}", c.to_string().green()),
+                Pipe::Empty => print!("{}", ".".black()),
+                _ => print!("{}", c),
+            }
         }
         println!();
     }
@@ -30,7 +35,11 @@ pub fn print_pipes_connected_to_start(pipes: &Vec<Vec<Pipe>>, distances: &Vec<Ve
             if let Some(distance) = distances[y][x] {
                 print!("{}", map_char(pipe).to_string().yellow());
             } else {
-                print!("{}", map_char(pipe));
+                match pipe {
+                    Pipe::Start => print!("{}", map_char(pipe).to_string().green()),
+                    Pipe::Empty => print!("{}", ".".black()),
+                    _ => print!("{}", map_char(pipe)),
+                }
             }
         }
         println!();

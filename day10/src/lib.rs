@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use queues::*;
+use std::collections::HashSet;
 
 mod debug;
 
@@ -22,7 +22,7 @@ impl Port {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum Pipe {
     Start,
     Vertical,
@@ -31,7 +31,7 @@ enum Pipe {
     NorthWest,
     SouthWest,
     SouthEast,
-    Empty
+    Empty,
 }
 
 impl Pipe {
@@ -45,7 +45,7 @@ impl Pipe {
             '7' => Pipe::SouthWest,
             'F' => Pipe::SouthEast,
             '.' => Pipe::Empty,
-            _ => panic!("Unknown pipe: {}", c)
+            _ => panic!("Unknown pipe: {}", c),
         }
     }
 
@@ -74,7 +74,7 @@ fn find_start(pipes: &Vec<Vec<Pipe>>) -> (usize, usize) {
     for (y, line) in pipes.iter().enumerate() {
         for (x, pipe) in line.iter().enumerate() {
             if *pipe == Pipe::Start {
-                return (x, y)
+                return (x, y);
             }
         }
     }
@@ -109,18 +109,22 @@ fn get_distances(pipes: &Vec<Vec<Pipe>>, start_x: usize, start_y: usize) -> Vec<
                 Port::South => (x as i32, y as i32 + 1),
                 Port::West => (x as i32 - 1, y as i32),
             };
-            if neighbor_x < 0 || neighbor_y < 0 || neighbor_x >= pipes[0].len() as i32 || neighbor_y >= pipes.len() as i32 {
-                continue
+            if neighbor_x < 0
+                || neighbor_y < 0
+                || neighbor_x >= pipes[0].len() as i32
+                || neighbor_y >= pipes.len() as i32
+            {
+                continue;
             }
             let neighbor_x = neighbor_x as usize;
             let neighbor_y = neighbor_y as usize;
 
             if !are_connected(&port, &pipes[neighbor_y][neighbor_x]) {
-                continue
+                continue;
             }
 
             if let Some(_) = &distance_field[neighbor_y][neighbor_x] {
-                continue
+                continue;
             }
             distance_field[neighbor_y][neighbor_x] = Some(distance + 1);
             queue.add((neighbor_x, neighbor_y)).unwrap();
@@ -128,6 +132,22 @@ fn get_distances(pipes: &Vec<Vec<Pipe>>, start_x: usize, start_y: usize) -> Vec<
     }
 
     distance_field
+}
+
+fn remove_unnecessary_pipes(
+    original_pipes: &Vec<Vec<Pipe>>,
+    distance_field: &Vec<Vec<Option<u32>>>,
+) -> Vec<Vec<Pipe>> {
+    let mut pipes = original_pipes.clone();
+
+    for y in 0..pipes.len() {
+        for x in 0..pipes[0].len() {
+            if let None = distance_field[y][x] {
+                pipes[y][x] = Pipe::Empty;
+            }
+        }
+    }
+    pipes
 }
 
 fn find_farthest_pipe_distance(input: &str) -> u32 {
@@ -138,7 +158,7 @@ fn find_farthest_pipe_distance(input: &str) -> u32 {
     let (start_x, start_y) = find_start(&pipes);
     let distance_field = get_distances(&pipes, start_x, start_y);
 
-    debug:: print_pipes_connected_to_start(&pipes, &distance_field);
+    debug::print_pipes_connected_to_start(&pipes, &distance_field);
     debug::print_distances(&distance_field);
 
     distance_field
@@ -147,6 +167,23 @@ fn find_farthest_pipe_distance(input: &str) -> u32 {
         .max()
         .unwrap()
         .unwrap()
+}
+
+fn expand_pipes(original_pipes: &Vec<Vec<Pipe>>) -> Vec<Vec<Pipe>>
+
+fn find_number_of_inside_fields(input: &str) -> u32 {
+    let pipes = parse_pipes(input);
+
+    debug::print_pipes(&pipes);
+
+    let (start_x, start_y) = find_start(&pipes);
+    let distance_field = get_distances(&pipes, start_x, start_y);
+
+    let pipes = remove_unnecessary_pipes(&pipes, &distance_field);
+
+    debug::print_pipes_connected_to_start(&pipes, &distance_field);
+
+    todo!()
 }
 
 #[cfg(test)]
@@ -174,17 +211,24 @@ mod tests {
         assert_eq!(find_farthest_pipe_distance(&file), 7173)
     }
 
-    // #[test]
-    // fn small_input_second_example() {
-    //     // The easiest way to open the data is to include it into the generated binary.
-    //     let input = include_str!("../input/small.txt");
-    //     assert_eq!(calc_history_prev_prediction_sum(input), 2)
-    // }
+    #[test]
+    fn small_input_inside() {
+        // The easiest way to open the data is to include it into the generated binary.
+        let input = include_str!("../input/small.txt");
+        assert_eq!(find_number_of_inside_fields(input), 0)
+    }
 
-    // #[test]
-    // fn large_input_complicated() {
-    //     // You can also read the file completely into memory
-    //     let file = std::fs::read_to_string("input/big.txt").expect("Could not open input file");
-    //     assert_eq!(calc_history_prev_prediction_sum(&file), 1022)
-    // }
+    #[test]
+    fn small_extended_inside() {
+        // The easiest way to open the data is to include it into the generated binary.
+        let input = include_str!("../input/small_extended.txt");
+        assert_eq!(find_number_of_inside_fields(input), 0)
+    }
+
+    #[test]
+    fn large_input_inside() {
+        // You can also read the file completely into memory
+        let file = std::fs::read_to_string("input/big.txt").expect("Could not open input file");
+        assert_eq!(find_number_of_inside_fields(&file), 0)
+    }
 }
